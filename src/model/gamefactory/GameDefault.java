@@ -1,0 +1,362 @@
+// Game.java
+package model.gamefactory;
+
+import controller.MainFrame;
+import model.Board;
+import model.Player;
+import model.TetrisBlock;
+import model.TetrisCell;
+import view.panel.GamePanel;
+import config.HighScoreManager;
+
+import javax.swing.*;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+
+// Base Concrete Product for the child Concrete Products (other modes). For the factory design.
+public class GameDefault implements Game {
+    protected MainFrame mainFrame;
+    protected Board board;
+    protected TetrisBlock activeShape;
+    protected TetrisBlock nextShape;
+    private int nextShapeIndex;
+    protected GamePanel gamePanel;
+
+    protected boolean playing;
+    protected boolean paused = false;
+    protected Player player;
+    protected String playerName;
+
+    protected int period; //period to set the thread timer
+    // decreases thread period by 15 every level up
+    protected int periodDecr = 15;
+    protected boolean gameRunning;
+
+    public GameDefault(MainFrame mainFrame, GamePanel gamePanel, String playerName) {
+        this.mainFrame = mainFrame;
+        this.gamePanel = gamePanel;
+        this.playerName = playerName;
+        this.board = new Board(mainFrame, this);
+        this.player = new Player(playerName, mainFrame.getConfigData().getStartLevel());
+        this.player.setPlayerType("Human");
+        this.nextShapeIndex=0;
+        this.activeShape = null;
+        gameRunning = false;
+        spawn();
+        this.period = 200 - (player.getLevel()*periodDecr); //starting period, each level will decrease this by 10 (can be changed)
+    }
+
+    //method which holds the logic for starting a new game
+    public void newGame() {
+        if (!gameRunning) {
+            mainFrame.playMusic();
+            this.gameRunning = true;
+            this.playing = true;
+            this.paused = false;
+            this.period = 200 - (player.getLevel()*periodDecr);
+            System.out.println("Game object says: New game Started at level " + player.getLevel());
+        }
+    }
+
+    // Start the game or offer user to start a new game if the prior game is over
+    public void start() {
+        //if game over or the game is paused, ignore start button
+        if(gameRunning) {
+            System.out.println("Game Object said: Game is already running");
+        } else {
+            newGame();
+        }
+    }
+
+    //logic for playing whilst "playing = true"
+    public void play() {
+        if (playing) {
+            if (this.activeShape == null) {
+                spawn();
+                gamePanel.updatePlayPanel();
+                activeShape.run(this.board);
+
+            } else {
+                if (activeShape.hasLanded() && shouldSettle() && activeShape.bottomCollision()) {
+                    finalizeShape();
+                    this.activeShape = null;
+                } else {
+                    activeShape.softDrop();
+                }
+            }
+        }
+    }
+
+    // Use old shape as the current shape, and spawn new shape for the next block
+    public void spawn() {
+        activeShape = nextShape;
+        nextShape = mainFrame.getNextBlock(nextShapeIndex+1);
+        nextShape.setBoard(board);
+        nextShapeIndex++;
+    }
+
+    // For safety, not sure if we need it
+    protected boolean shouldSettle() {
+        return System.currentTimeMillis() - activeShape.getLandTime() >= TetrisBlock.getBufferTime();
+    }
+
+    // Finalize the shape and place it on the board (for slight landing buffer)
+    protected void finalizeShape() {
+        activeShape.placeOnBoard();
+        mainFrame.playSound("blockPlacement");
+        checkForLineClear();
+        if (isGameOver()) {
+            this.playing = false;
+            mainFrame.playSound("gameOver");
+            gameOverPanel();
+        }
+    }
+
+    // Check for line clear
+    protected void checkForLineClear() {
+        // Logic to check and clear full lines on the board
+        int clearedLines = board.clearCompleteLines();
+        if (clearedLines>0) {
+            System.out.println("Game Object says: " + clearedLines + " lines cleared");
+            player.updateScore(clearedLines);
+            //update MainFrame period in case of level up
+            //check if period is not less than 50
+            int newPeriod = 200 - (player.getLevel()*periodDecr);
+            if (newPeriod >= 50) {
+                this.period = newPeriod;
+            }
+            System.out.println("Game Object says: Period set to " + period);
+            mainFrame.updateGamePeriod();
+            //update PlayPanel
+            gamePanel.updatePlayPanel();
+        }
+    }
+
+    public void gameOverPanel() {
+        mainFrame.stopMusic();
+        this.gameRunning = false;
+        mainFrame.pauseGame();
+        if(mainFrame.getHighScoreData().isTopTenScore(player.getScore()) && player.getScore() > 0) {
+            String playerName = JOptionPane.showInputDialog(player.getName() + " Score: " + player.getScore() +
+                    " is a top 10 score! Enter your name to add to the high scores:");
+            if(playerName != null && playerName.length() > 0) {
+                // Add the score to the high score data
+                mainFrame.getHighScoreData().addScore(playerName, player.getScore(), player.getPlayerType());
+                // Save new score to scores.json
+                mainFrame.saveHighScoreData();
+            }
+        }
+
+        //new JDIalog for game over to ask if they're sure if they want to quit
+        JDialog dialog = new JDialog();
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setTitle("Game Over Panel");
+        dialog.setSize(200, 200);
+        dialog.setVisible(false);
+        //centre the dialog
+        dialog.setLocationRelativeTo(null);
+        int result;
+        String message;
+        //ask if they want to quit the game
+        if (mainFrame.getConfigData().isExtendedMode()) {
+            //message declares who won
+            message = "Game Over! " + player.getName() + " won! Do you want to go to the main menu?";
+        } else {
+            message = "Game Over! Do you want to go to the main menu?";
+        }
+        result = JOptionPane.showConfirmDialog(dialog, message);
+
+
+        if (result == JOptionPane.YES_OPTION) {
+            System.out.println("Game Object said: going to main menu");
+            resetGame();
+            dialog.dispose();
+            //go to main panel
+            mainFrame.showMainPanel();
+        } else {
+            System.out.println("Game Object said: staying in game");
+            gamePanel.setStartButtonText("New Game");
+            //refocus on game panel
+            mainFrame.getGamePanel().requestFocusInWindow();
+            dialog.dispose();
+        }
+        mainFrame.gameOverLoser(this);
+    }
+
+    // Determine if game over conditions are met
+    public boolean isGameOver() {
+        //if any x in the first 3 lines is occupied
+        for (int y = 0; y < 3; y++) {
+            for (int x = board.getSpawnY(); x < board.getSpawnX() + 4; x++) {
+                if (board.getCell(x, y) != null) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public void gameOverWinner() {
+        player.setWinner(true);
+        playing = false;
+        paused = true;
+        gameRunning = false;
+    }
+
+    public void gameOverLoser() {
+        player.setWinner(false);
+        playing = false;
+        paused = true;
+        gameRunning = false;
+    }
+
+    // Pauses the game if it's playing, resumes if it's paused
+    public void pause() {
+        if (paused && !playing) {
+            mainFrame.playMusic();
+            playing = true;
+            paused = false;
+            gamePanel.setPaused(false);
+            return;
+        }
+        if (playing) {
+            mainFrame.stopMusic();
+            System.out.println("Game Object says: Game paused");
+            playing = false;
+            paused = true;
+            gamePanel.setPaused(true);
+        } else {
+            return;
+        }
+
+        // If pressing P again, resume game
+        mainFrame.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent evt) {
+                if (evt.getKeyCode() == KeyEvent.VK_P) {
+                    System.out.println("Game Object says: P key pressed, resuming game...");
+                    resumeGame();
+                }
+            }
+        });
+    }
+
+    // Resumes a paused game
+    public void resumeGame() {
+        mainFrame.playMusic();
+        System.out.println("Game Object says: Game resumed");
+        playing = true;
+        paused = false;
+        gamePanel.setPaused(false);
+        gamePanel.requestFocusInWindow();
+    }
+
+
+    //Stops the game and offers the user an option to return to the main menu
+    public void stop() {
+        mainFrame.stopMusic();
+        //remember if it was paused
+        Boolean wasPaused = isPaused();
+        if (playing) {
+            System.out.println("Game paused");
+            mainFrame.pauseGame(); // pauses both games if multiplayer
+            gamePanel.setPaused(true);
+        }
+    }
+
+    //Update handles user keyboard input and updates the game state accordingly
+    public void update(int keyCode) {
+        if (activeShape==null) {
+            return;
+        }
+        if (playing) {
+            switch (keyCode) {
+                case KeyEvent.VK_LEFT:
+                    System.out.println(playerName+": Left key pressed");
+                    activeShape.moveLeft();
+                    break;
+                case KeyEvent.VK_RIGHT:
+                    System.out.println(playerName+": Right key pressed");
+                    activeShape.moveRight();
+                    break;
+                case KeyEvent.VK_DOWN:
+                    System.out.println(playerName+": Down key pressed");
+                    activeShape.softDrop();
+                    activeShape.softDrop();
+                    break;
+                case KeyEvent.VK_UP:
+                    System.out.println(playerName+": Up key pressed");
+                    activeShape.rotateRight();
+                    break;
+                case KeyEvent.VK_CONTROL:
+                    System.out.println(playerName+": Control key pressed");
+                    activeShape.rotateLeft();
+                    break;
+                case KeyEvent.VK_SPACE:
+                    System.out.println(playerName+": Space key pressed"); // hard drop
+                    activeShape.softDrop();
+                    activeShape.softDrop();
+                    break;
+            }
+        }
+    }
+
+    public Board<TetrisCell> getBoard() {
+        return board;
+    }
+
+    public boolean isPlaying() {
+        return playing;
+    }
+
+    public void resetGame() {
+        this.board.clearBoard();
+        this.gameRunning = false;
+        this.activeShape = null;
+        this.playing = false;
+        this.paused = false;
+        this.player.reset();
+        this.period = 200 - (player.getLevel()*periodDecr);
+        mainFrame.repaintBoard(); //don't delete or a new game won't render its new state on the fieldPanel in the GamePanel
+    }
+
+    //update period and return it to the thread assigned to the game
+    public int getPeriod() {
+        return period;
+    }
+
+    public void setStartLevel(int level) {
+        resetGame();
+        player.setLevel(level);
+        this.period = 200 - (player.getLevel()*periodDecr);
+        mainFrame.getGameLogicOne().setPeriod(period);
+        System.out.println("Game Object says: Level set to " + player.getLevel());
+    }
+
+    // For if the game is running (even if paused) so the start button doesn't reset the game
+    public boolean isGameRunning() {
+        return gameRunning;
+    }
+
+    public int getScore() {
+        return player.getScore();
+    }
+
+
+    public boolean isPaused() {
+        return paused;
+    }
+
+    public TetrisBlock getNextPiece() {
+        return nextShape;
+    }
+
+    //For AI
+    public TetrisBlock getActiveShape() {
+        return activeShape;
+    }
+
+    public Player getPlayer() {
+        return player;
+    }
+}
