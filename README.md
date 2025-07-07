@@ -1,16 +1,9 @@
-Griffith University 2805ICT/3815ICT/7805ICT (Group 4)
-* Student name: Fiston Kayeye, Student ID: 5303300, Enrolled Course Code: 2805ICT, GH: **Sarvinfils**
-* Student name: Jack Carrall, Student ID: 5241918, Enrolled Course Code: 3815ICT, GH: **TheCarrot3702**
-* Student name: Lucas Setiady, Student ID: 5178088, Enrolled Course Code: 2805ICT, GH: **Iseti1**
-* Student name: Stefan Barosan, Student ID: 5277574, Enrolled Course Code: 2805ICT, GH: **MatchaBreak**
-* Student name: Joseph Fernando, Student ID: 5326097, Enrolled Course Code: 2805ICT, GH: **jfernando02**
-
 # Tetris Game
-This is a custom Java implementation of the classic Tetris game utilising IntelliJ
+This is a custom Java implementation of the classic Tetris game. This version is an adaption of a prior team project 
+and therefore still under construction. The game features a graphical user interface, smooth gameplay, and various 
+game modes.
 
 ## Project Structure
-![image](https://github.com/user-attachments/assets/92cd6c44-b9d2-4cfe-8bb5-db639a43c7a4)
-
 ```
 TetrisGame/
 ├── src/
@@ -59,8 +52,8 @@ TetrisGame/
 ## Features
 
 - Smooth Tetris Gameplay, with a potential future optional feature of discrete Tetromino movement.
-- High score tracking (In the works)
-- Configurable settings (In the works)
-- AI Gameplay (In the works)
-- Multiplayer (In the works)
+- High score tracking 
+- Configurable settings 
+- AI Gameplay
+- Multiplayer 
 - Splash screen on startup
