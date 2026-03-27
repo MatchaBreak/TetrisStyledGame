@@ -11,9 +11,9 @@ A Tetris-style game built in **Java (Swing)** with:
 
 ---
 
-## Screenshots
+## Gameplay
 
-![Gameplay](https://github.com/user-attachments/assets/989910a6-6b1d-467e-ba2e-7e3327004abf)
+https://github.com/user-attachments/assets/e0733399-1d70-4f90-a240-170be6002dce
 
 ---
 
