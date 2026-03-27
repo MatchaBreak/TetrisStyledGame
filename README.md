@@ -7,7 +7,7 @@ A Tetris-style game built in **Java (Swing)** with:
 - **High score table** persisted to JSON
 - Menu UI (Splash → Main Menu → Play / Configuration / High Scores)
 
-> This project is an adaptation of a prior university group assignment and is still evolving.
+> This project is an adaptation of a prior university group assignment and may still receive some updates.
 
 ---
 
@@ -117,5 +117,3 @@ The Configuration dialog lets you adjust:
 - Player Two type: `None | Human | AI | External`
 
 ---
-
-## Project Structure (current)
